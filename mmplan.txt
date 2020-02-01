@@ -1,0 +1,8 @@
+Testing Schedule
+
+- ability to move
+- ability to move precisely (point turns, diagonal movement) using sensor data
+- ability to keep track of what tile you're in
+- ability to follow a path
+- ability to map out maze
+- full functionality
