@@ -40,6 +40,8 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+FMPI2C_HandleTypeDef hfmpi2c1;
+
 osThreadId defaultTaskHandle;
 /* USER CODE BEGIN PV */
 
@@ -48,6 +50,7 @@ osThreadId defaultTaskHandle;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_FMPI2C1_Init(void);
 void StartDefaultTask(void const * argument);
 
 /* USER CODE BEGIN PFP */
@@ -87,6 +90,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_FMPI2C1_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -171,6 +175,46 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief FMPI2C1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_FMPI2C1_Init(void)
+{
+
+  /* USER CODE BEGIN FMPI2C1_Init 0 */
+
+  /* USER CODE END FMPI2C1_Init 0 */
+
+  /* USER CODE BEGIN FMPI2C1_Init 1 */
+
+  /* USER CODE END FMPI2C1_Init 1 */
+  hfmpi2c1.Instance = FMPI2C1;
+  hfmpi2c1.Init.Timing = 0x00303D5B;
+  hfmpi2c1.Init.OwnAddress1 = 0;
+  hfmpi2c1.Init.AddressingMode = FMPI2C_ADDRESSINGMODE_7BIT;
+  hfmpi2c1.Init.DualAddressMode = FMPI2C_DUALADDRESS_DISABLE;
+  hfmpi2c1.Init.OwnAddress2 = 0;
+  hfmpi2c1.Init.OwnAddress2Masks = FMPI2C_OA2_NOMASK;
+  hfmpi2c1.Init.GeneralCallMode = FMPI2C_GENERALCALL_DISABLE;
+  hfmpi2c1.Init.NoStretchMode = FMPI2C_NOSTRETCH_DISABLE;
+  if (HAL_FMPI2C_Init(&hfmpi2c1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Configure Analogue filter
+  */
+  if (HAL_FMPI2CEx_ConfigAnalogFilter(&hfmpi2c1, FMPI2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN FMPI2C1_Init 2 */
+
+  /* USER CODE END FMPI2C1_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -196,11 +240,12 @@ static void MX_GPIO_Init(void)
                           |LED_7_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LED_3_GPIO_Port, LED_3_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, I2C_RST_Pin|I2C_SEL0_Pin|I2C_SEL1_Pin|I2C_SEL2_Pin
+                          |LED_2_Pin|LED_1_Pin|LED_0_Pin|S4_SX_Pin
+                          |S4_INT_Pin|S3_INT_Pin|S3_XS_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, LED_2_Pin|LED_1_Pin|LED_0_Pin|S4_SX_Pin
-                          |S4_INT_Pin|S3_INT_Pin|S3_XS_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LED_3_GPIO_Port, LED_3_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : S2_INT_Pin S1_INT_Pin S0_INT_Pin S5_INT_Pin
                            LED_6_Pin LED_5_Pin LED_4_Pin */
@@ -241,21 +286,23 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : I2C_RST_Pin I2C_SEL0_Pin I2C_SEL1_Pin I2C_SEL2_Pin
+                           LED_2_Pin LED_1_Pin LED_0_Pin S4_INT_Pin
+                           S3_INT_Pin */
+  GPIO_InitStruct.Pin = I2C_RST_Pin|I2C_SEL0_Pin|I2C_SEL1_Pin|I2C_SEL2_Pin
+                          |LED_2_Pin|LED_1_Pin|LED_0_Pin|S4_INT_Pin
+                          |S3_INT_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
   /*Configure GPIO pin : LED_3_Pin */
   GPIO_InitStruct.Pin = LED_3_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED_3_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : LED_2_Pin LED_1_Pin LED_0_Pin S4_INT_Pin
-                           S3_INT_Pin */
-  GPIO_InitStruct.Pin = LED_2_Pin|LED_1_Pin|LED_0_Pin|S4_INT_Pin
-                          |S3_INT_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pins : S4_SX_Pin S3_XS_Pin */
   GPIO_InitStruct.Pin = S4_SX_Pin|S3_XS_Pin;

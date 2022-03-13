@@ -78,6 +78,80 @@ void HAL_MspInit(void)
   /* USER CODE END MspInit 1 */
 }
 
+/**
+* @brief FMPI2C MSP Initialization
+* This function configures the hardware resources used in this example
+* @param hfmpi2c: FMPI2C handle pointer
+* @retval None
+*/
+void HAL_FMPI2C_MspInit(FMPI2C_HandleTypeDef* hfmpi2c)
+{
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
+  if(hfmpi2c->Instance==FMPI2C1)
+  {
+  /* USER CODE BEGIN FMPI2C1_MspInit 0 */
+
+  /* USER CODE END FMPI2C1_MspInit 0 */
+  /** Initializes the peripherals clock
+  */
+    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_FMPI2C1;
+    PeriphClkInitStruct.Fmpi2c1ClockSelection = RCC_FMPI2C1CLKSOURCE_APB;
+    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
+    __HAL_RCC_GPIOC_CLK_ENABLE();
+    /**FMPI2C1 GPIO Configuration
+    PC6     ------> FMPI2C1_SCL
+    PC7     ------> FMPI2C1_SDA
+    */
+    GPIO_InitStruct.Pin = GPIO_PIN_6|GPIO_PIN_7;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF4_FMPI2C1;
+    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+    /* Peripheral clock enable */
+    __HAL_RCC_FMPI2C1_CLK_ENABLE();
+  /* USER CODE BEGIN FMPI2C1_MspInit 1 */
+
+  /* USER CODE END FMPI2C1_MspInit 1 */
+  }
+
+}
+
+/**
+* @brief FMPI2C MSP De-Initialization
+* This function freeze the hardware resources used in this example
+* @param hfmpi2c: FMPI2C handle pointer
+* @retval None
+*/
+void HAL_FMPI2C_MspDeInit(FMPI2C_HandleTypeDef* hfmpi2c)
+{
+  if(hfmpi2c->Instance==FMPI2C1)
+  {
+  /* USER CODE BEGIN FMPI2C1_MspDeInit 0 */
+
+  /* USER CODE END FMPI2C1_MspDeInit 0 */
+    /* Peripheral clock disable */
+    __HAL_RCC_FMPI2C1_CLK_DISABLE();
+
+    /**FMPI2C1 GPIO Configuration
+    PC6     ------> FMPI2C1_SCL
+    PC7     ------> FMPI2C1_SDA
+    */
+    HAL_GPIO_DeInit(GPIOC, GPIO_PIN_6|GPIO_PIN_7);
+
+  /* USER CODE BEGIN FMPI2C1_MspDeInit 1 */
+
+  /* USER CODE END FMPI2C1_MspDeInit 1 */
+  }
+
+}
+
 /* USER CODE BEGIN 1 */
 
 /* USER CODE END 1 */

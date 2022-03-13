@@ -83,6 +83,14 @@ void Error_Handler(void);
 #define OPT_C_GPIO_Port GPIOB
 #define OPT_D_Pin GPIO_PIN_10
 #define OPT_D_GPIO_Port GPIOB
+#define I2C_RST_Pin GPIO_PIN_12
+#define I2C_RST_GPIO_Port GPIOB
+#define I2C_SEL0_Pin GPIO_PIN_13
+#define I2C_SEL0_GPIO_Port GPIOB
+#define I2C_SEL1_Pin GPIO_PIN_14
+#define I2C_SEL1_GPIO_Port GPIOB
+#define I2C_SEL2_Pin GPIO_PIN_15
+#define I2C_SEL2_GPIO_Port GPIOB
 #define S5_INT_Pin GPIO_PIN_8
 #define S5_INT_GPIO_Port GPIOC
 #define S5_XS_Pin GPIO_PIN_9
