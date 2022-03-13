@@ -15,6 +15,18 @@
   *
   ******************************************************************************
   */
+
+// Uh so the current plan is that the sensor values are read with an interrupt
+// But then we also implement blocking functions for moving in a direction, or
+// checking if there's a wall in a given direction. That can do what they want
+
+// TODO: Function to move 1 square in any direction
+// TODO: Function to check if there's a wall in a given direction
+// TODO: Check DIP switches for maze algo
+// TODO: Once we've solved the maze, go back to the beginning, and run it
+// TODO: Any number of bugs arising from the fact that I don't know C
+
+
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -22,7 +34,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdlib.h>
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -32,6 +45,13 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define MAZE_SIZE 10
+// 0 - Basic A*; 1 - A*, but tries to go center; 2 - A²*, 3 - Augment A* and extra huristic
+#define MAPPING_MODE 3
+
+#define END_X 5
+#define END_Y 5
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -59,7 +79,262 @@ void StartDefaultTask(void const * argument);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+// A maze
+// Uh
+// maze[Y][X][1: vertical; 0: horizontal]
+// And the number represents the confidence
+// So 0 is we have no idea, and positive is wall, and negative is no wall
+int maze[11][11][2];
 
+// Aahhhah
+typedef struct Node Node;
+
+struct Node {
+	int x;
+	int y;
+	int closed; //Boolean but this is C :(
+	int distance; // The length of the path up to this point, this.last.distance + 1
+	int guess; // The heuristic, usually Manhattan to goal with no walls
+	int score; //The guess + distance (depending on algo) (lower is better)
+	Node* last; //The parent node, the node from which we discovered this node
+};
+
+// The list of nodes
+// Sorted such that closed nodes are 0..closedNodes-1
+// And nodes after that increase in score
+// This is the canonical list of nodes, order doesn't matter
+// All other nodes are pointers into nodesStatic
+Node nodesStatic[MAZE_SIZE*MAZE_SIZE];
+// A*'s working list of nodes. 0..closedNodes-1 are closed, and closedNodes..numNodes-1 are open
+Node *nodes[MAZE_SIZE*MAZE_SIZE];
+int closedNodes = 0;
+int numNodes = 0;
+
+//let robot (Needs to keep track of inter-tile location, e.g. encoder counts)
+Node *current; //The node the robot is currently at (or that A* thinks we're at)
+Node *goal; //The current goal node
+//let state (Might be needed to track what we're doing. Might be fine a while true loop and blocking functions)
+Node *backPath[MAZE_SIZE*MAZE_SIZE]; // Used to store the path along which we backtrack to get to goal
+int backPathLength = 0;
+
+// The main path, once we've solved the maze, the route we use
+Node *mainPath[MAZE_SIZE*MAZE_SIZE];
+int pathLength = 0;
+
+//Heuristic function
+int h (int x, int y) {
+	return abs(END_X - x) + abs(END_Y - y);
+}
+
+void insertAt(Node **arr, int len, int i, Node* n) {
+	for (int j = len; j > i; j --) {
+		arr[j] = arr[j - 1];
+	}
+	arr[i] = n;
+}
+
+void removeAt(Node **arr, int len, int i) {
+	for (int j = i; j < len - 1; j ++) {
+		arr[j] = arr[j + 1];
+	}
+}
+
+void addNodeIfNotExists(int x, int y) {
+	//Check if we've seen the node before
+	for (int i = 0; i < numNodes; i++) {
+		if (nodes[i]->x == x && nodes[i]->y == y) {
+			//We don't have to ever update the score on a node
+			//Because our heuristic is nice (just distance)
+			return;
+		}
+	}
+
+	Node *n = &nodesStatic[numNodes];
+	n->x = x;
+	n->y = y;
+	n->last = current;
+	n->guess = h(x, y);
+	n->distance = current->distance + 1;
+	if (MAPPING_MODE == 0) {
+		n->score = n->distance + n->guess;
+	}else if (MAPPING_MODE == 1 || MAPPING_MODE == 3) {
+		n->score = n->distance + n->guess*10;
+	}
+
+	/*//Just assertions
+	assertEq(nodes[closedNodes].closed, false, "AHHHH");
+	if (closedNodes < nodes.length - 1) {
+		assertEq(nodes[closedNodes + 1].closed, false, "B");
+	}else {
+		console.assert(false, "testing");
+	}
+	if (closedNodes >= 1) {
+		assertEq(nodes[closedNodes - 1].closed, true, "B");
+	}*/
+
+	//Sort the new node in
+	for (int i = closedNodes; i < numNodes; i++) {
+		if (nodes[i]->score > n->score) {
+			//nodes.splice(i, 0, n);
+			//arr, length, index to insert, item
+			insertAt(nodes, numNodes, i, n);
+			numNodes++;
+			return;
+		}
+	}
+	//Otherwise, add the node to the end
+    //	nodes.splice(nodes.length, 0, n);
+    //	insertAt(nodes, numNodes, numNodes, n);
+	nodes[numNodes] = n;
+	numNodes++;
+}
+
+int checkDone() {
+	return current->x == END_X && current->y == END_Y;
+}
+
+// Once we've solved the maze, converts node tree into `mainPath` (a list)
+void createPath() {
+	mainPath[0] = current;
+	Node *previous = current;
+	pathLength = 1;
+	while (previous->last->distance >= 0) {
+		// path.unshift(backtrack.last);
+		insertAt(mainPath, pathLength, 0, previous->last);
+		pathLength++;
+		previous = previous->last;
+	}
+}
+
+
+
+//Update the known information about the maze with what we know
+void updateMaze() {
+	//TODO: Scan the maze
+
+	//If there's not a wall to each of our sides, add a new node there
+	if (!maze[current->y][current->x][0]) {
+		addNodeIfNotExists(current->x, current->y - 1);
+	}
+	//Left
+	if (!maze[current->y][current->x][1]) {
+		addNodeIfNotExists(current->x - 1, current->y);
+	}
+	//Down
+	if (!maze[current->y + 1][current->x][0]) {
+		addNodeIfNotExists(current->x, current->y + 1);
+	}
+	//Right
+	if (!maze[current->y][current->x + 1][1]) {
+		addNodeIfNotExists(current->x + 1, current->y);
+	}
+}
+
+void updateGoal () {
+	if (closedNodes >= numNodes) {
+		return;
+	}
+
+	if (MAPPING_MODE == 1 || MAPPING_MODE == 2) {
+		goal = nodes[closedNodes];
+	}else {
+		//If there's one adjacent node, go there, otherwise go to A*
+		Node *adjacentNode = NULL;
+
+		for (int i = 0; i < numNodes; i++) {
+			//If it's open and adjacent
+			if (nodes[i]->last == current && !nodes[i]->closed) {
+				// If we already have one
+				if (adjacentNode != NULL) {
+					//Then we want to ignore it
+					adjacentNode = NULL;
+				}else {
+					adjacentNode = nodes[i];
+				}
+			}
+		}
+
+		if (adjacentNode == NULL) {
+			goal = nodes[closedNodes];
+		}else {
+			goal = adjacentNode;
+		}
+	}
+}
+
+void createBackPath() {
+	//finding backPath only needs to run once
+	// Create a path.
+	//      Find a common parent of current and goal
+	//	backPath[0] = current;
+	//	backPath[1] = goal;
+	memcpy(&backPath[0], current, sizeof(Node));
+	memcpy(&backPath[1], goal, sizeof(Node));
+	int numMid = 1; //The number of nodes that we go up before going back down.
+	backPathLength = 2;
+
+	const int genDiff = abs(current->distance - goal->distance);
+
+	for (int i = 0; i < genDiff; i++) {
+		if (current->distance > goal->distance) {
+			// parentCur.push(parentCur[parentCur.length-1].last);
+			// backPath.splice(numMid, 0, backPath[numMid - 1].last);
+			insertAt(backPath, backPathLength, numMid, backPath[numMid - 1]->last);
+			numMid++;
+			backPathLength++;
+		}else {
+			// parentGoal.unshift(parentGoal[0].last);
+			// backPath.splice(numMid, 0, backPath[numMid].last);
+			insertAt(backPath, backPathLength, numMid, backPath[numMid]->last);
+			backPathLength++;
+		}
+	}
+	//Walk back up the tree until they're the same
+	while (backPath[numMid-1]->last != backPath[numMid]->last) {
+		// parentCur.push(parentCur[parentCur.length-1].last);
+		// backPath.splice(numMid, 0, backPath[numMid-1].last);
+		insertAt(backPath, backPathLength, numMid, backPath[numMid-1]->last);
+		numMid++;
+		backPathLength++;
+
+		// parentGoal.unshift(parentGoal[0].last);
+		// backPath.splice(numMid, 0, backPath[numMid].last);
+		insertAt(backPath, backPathLength, numMid, backPath[numMid]->last);
+		backPathLength++;
+	}
+	//Remove the duplicated shared parent, that they both pushed
+	// backPath.slice(numMid, 0, backPath[numMid].last);
+	removeAt(backPath, backPathLength, numMid);
+	backPathLength--;
+}
+
+void moveToGoal() {
+    // Move back along path
+    //      To move one node, move ? per tile
+    // backPath is a list of contiguous nodes. First is current, last is goal
+
+	//TODO: Uh spin some motors or something
+	// Probably refactor this to call a blocking move function,
+	// And continue once we're there, instead of checking if we're there
+
+//    if (backPath[1].x == (robot.x - SQUARE_SIZE/2)/SQUARE_SIZE &&
+//        backPath[1].y == (robot.y - SQUARE_SIZE/2)/SQUARE_SIZE) {
+//        //Then we've made it
+//        backPath.shift(); //Remove the first
+//    }
+	if (1==1 /*We're there, by some metric*/) {
+		//Then we've made it
+		removeAt(backPath, backPathLength, 0);
+		backPathLength--;
+	}
+
+    if (backPathLength == 1) {
+        //Then we're actually done,
+
+        current = backPath[0];
+        backPathLength = 0;
+    }
+}
 /* USER CODE END 0 */
 
 /**
@@ -92,6 +367,8 @@ int main(void)
   MX_GPIO_Init();
   MX_FMPI2C1_Init();
   /* USER CODE BEGIN 2 */
+
+  // TODO: Check DIP here I think
 
   /* USER CODE END 2 */
 
@@ -339,11 +616,63 @@ static void MX_GPIO_Init(void)
 void StartDefaultTask(void const * argument)
 {
   /* USER CODE BEGIN 5 */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
+	/* Infinite loop */
+	while (1 == 1) {
+		//Then we've solved the maze
+		if (pathLength > 0) {
+			osDelay(10);
+			//TODO: Run the maze in reverse, then forwards
+		}else {
+			//Go to goal target, if we get there, update
+			//TODO: Check if we've made it to the goal
+			// if (goal.x == (robot.x - SQUARE_SIZE/2)/SQUARE_SIZE &&
+			// goal.y == (robot.y - SQUARE_SIZE/2)/SQUARE_SIZE) {
+			// Can probably check if backPathLength == 0 or something
+			if (1 == 1 /*TODO*/) {
+				//Update where we are
+				current = goal;
+
+				//Check if we're done
+				if (checkDone()) {
+					createPath();
+				}else {
+					//Update our knowledge of the maze, from the current tile
+					// i.e. scan around us
+					updateMaze();
+
+					//Close the current node
+					current->closed = 1;
+					//If this wasn't the next node scheduled to be closed, we need to move it to the closed section of the list
+					if (nodes[closedNodes] != current) {
+						Node *lastValue = nodes[closedNodes];
+						for (int i = closedNodes + 1; i < numNodes; i++) {
+							Node *tmp = nodes[i];
+							nodes[i] = lastValue;
+							lastValue = tmp;
+							if (tmp == current) {
+								//Then we're done
+								break;
+							}
+						}
+						nodes[closedNodes] = current;
+					}
+					closedNodes++;
+
+					// Update goal
+					//  get a new goal
+					updateGoal();
+				}
+			}else {
+				//Move to previously discovered `goal` tile
+				if (backPathLength > 0) {
+				  createBackPath();
+				}
+				moveToGoal();
+			}
+		}
+		osDelay(1);
+	}
+
   /* USER CODE END 5 */
 }
 
