@@ -368,7 +368,13 @@ int main(void)
   MX_FMPI2C1_Init();
   /* USER CODE BEGIN 2 */
 
-  // TODO: Check DIP here I think
+  // Read DIP values
+  const OPT_A = HAL_GPIO_ReadPin(OPT_A_GPIO_Port, OPT_A_Pin);
+  const OPT_B = HAL_GPIO_ReadPin(OPT_B_GPIO_Port, OPT_B_Pin);
+  const OPT_C = HAL_GPIO_ReadPin(OPT_C_GPIO_Port, OPT_C_Pin);
+  const OPT_D = HAL_GPIO_ReadPin(OPT_D_GPIO_Port, OPT_D_Pin);
+
+  //TODO: use DIP values
 
   /* USER CODE END 2 */
 
@@ -520,8 +526,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, S2_INT_Pin|S2_XS_Pin|S1_INT_Pin|S1_SX_Pin
-                          |S0_INT_Pin|S0_SX_Pin|S5_INT_Pin|S5_XS_Pin
+  HAL_GPIO_WritePin(GPIOC, S2_XS_Pin|S1_SX_Pin|S0_SX_Pin|S5_XS_Pin
                           |LED_6_Pin|LED_5_Pin|LED_4_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
@@ -530,19 +535,15 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, I2C_RST_Pin|I2C_SEL0_Pin|I2C_SEL1_Pin|I2C_SEL2_Pin
-                          |LED_2_Pin|LED_1_Pin|LED_0_Pin|S4_SX_Pin
-                          |S4_INT_Pin|S3_INT_Pin|S3_XS_Pin, GPIO_PIN_RESET);
+                          |LED_1_Pin|LED_0_Pin|S4_SX_Pin|S3_XS_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LED_3_GPIO_Port, LED_3_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : S2_INT_Pin S1_INT_Pin S0_INT_Pin S5_INT_Pin
-                           LED_6_Pin LED_5_Pin LED_4_Pin */
-  GPIO_InitStruct.Pin = S2_INT_Pin|S1_INT_Pin|S0_INT_Pin|S5_INT_Pin
-                          |LED_6_Pin|LED_5_Pin|LED_4_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  /*Configure GPIO pins : S2_INT_Pin S1_INT_Pin S5_INT_Pin */
+  GPIO_InitStruct.Pin = S2_INT_Pin|S1_INT_Pin|S5_INT_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pins : S2_XS_Pin S1_SX_Pin S0_SX_Pin S5_XS_Pin */
@@ -561,11 +562,9 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PA4 PA5 PA6 PA7
-                           MX_Fault_Pin */
-  GPIO_InitStruct.Pin = GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7
-                          |MX_Fault_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  /*Configure GPIO pins : PA4 PA5 PA6 PA7 */
+  GPIO_InitStruct.Pin = GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
@@ -576,15 +575,26 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pins : I2C_RST_Pin I2C_SEL0_Pin I2C_SEL1_Pin I2C_SEL2_Pin
-                           LED_2_Pin LED_1_Pin LED_0_Pin S4_INT_Pin
-                           S3_INT_Pin */
+                           LED_1_Pin LED_0_Pin */
   GPIO_InitStruct.Pin = I2C_RST_Pin|I2C_SEL0_Pin|I2C_SEL1_Pin|I2C_SEL2_Pin
-                          |LED_2_Pin|LED_1_Pin|LED_0_Pin|S4_INT_Pin
-                          |S3_INT_Pin;
+                          |LED_1_Pin|LED_0_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : MX_Fault_Pin */
+  GPIO_InitStruct.Pin = MX_Fault_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(MX_Fault_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : LED_6_Pin LED_5_Pin LED_4_Pin */
+  GPIO_InitStruct.Pin = LED_6_Pin|LED_5_Pin|LED_4_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LED_3_Pin */
   GPIO_InitStruct.Pin = LED_3_Pin;
@@ -600,10 +610,35 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI2_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI2_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI4_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+
 }
 
 /* USER CODE BEGIN 4 */
+// GPIO_Pin is the pin of the sensor that trigger the interrupt
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+	// We only have finite number of interrupts
+	// We would love interrupts on S0_INT, S1_INT, S2_INT, S3_INT, S4_INT, S5_INT and M0_QA, M0_QB, Mq_QA, M1_B
+	// Can't have an interrupt for every sensor
+	// All 4 encoder pins are interrupt driven
+	// This means that we can't interrupt drive S4_INT (PB7), S3_INT (PB8), S0_INT (PC4)
 
+
+//	if (GPIO_Pin == P C 4) {
+//
+//	}
+}
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
